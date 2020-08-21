@@ -1,0 +1,90 @@
+#include <ETH.h>
+#include <WiFi.h>
+#include <WiFiAP.h>
+#include <WiFiClient.h>
+#include <WiFiGeneric.h>
+#include <WiFiMulti.h>
+#include <WiFiScan.h>
+#include <WiFiServer.h>
+#include <WiFiSTA.h>
+#include <WiFiType.h>
+#include <WiFiUdp.h>
+
+
+WiFiServer server(80);
+WiFiMulti WiFiMulti;
+
+//user settings
+const char *NAME_WIFI = "NAME_WIFI";
+const char *PASSWORD_WIFI = "PASSWORD_WIFI";
+
+const int timeDelta = 900000; //15 min
+
+const int releLight = 13;
+const int doorLock = 12;
+
+int currentTime,startTime;
+bool period = false;
+
+void setup()
+{
+    Serial.begin(115200);
+    delay(10);
+
+    pinMode(releLight, OUTPUT);
+    pinMode(doorLock, OUTPUT);
+
+    // We start by connecting to a WiFi network
+    WiFiMulti.addAP(NAME_WIFI, PASSWORD_WIFI);
+
+    Serial.println();
+    Serial.println();
+    Serial.print("Wait for WiFi... ");
+
+    while(WiFiMulti.run() != WL_CONNECTED) {
+        Serial.print(".");
+        delay(100);
+    }
+
+    Serial.println("");
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+
+    server.begin();
+}
+
+
+void loop()
+{
+  currentTime = millis();
+
+  if (period){
+    if ((currentTime-startTime)>=timeDelta)
+    {
+      digitalWrite(releLight, LOW);
+      Serial.println("light off");
+      period=false;
+      }
+    }
+
+  WiFiClient client = server.available();
+  if (client) {
+    Serial.println("New client");
+    String line = client.readStringUntil(':');
+    if(line.indexOf("GET /light_on")>=0){
+      period=true;
+      startTime = millis();
+      digitalWrite(releLight, HIGH);
+      Serial.println("GET /light_on");
+    }
+    if (line.indexOf("GET /open_door")>=0) {
+      digitalWrite(doorLock, HIGH);
+      delay(1000);
+      digitalWrite(doorLock, LOW);
+      Serial.println("GET /open_door");
+      }
+    client.stop();
+  }
+  delay(1000);
+}
